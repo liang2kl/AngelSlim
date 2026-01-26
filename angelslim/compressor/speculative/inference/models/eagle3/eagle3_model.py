@@ -486,6 +486,11 @@ class Eagle3Model(nn.Module):
                 predictors.append(predict_class(**kwargs))
         is_thinking = True
 
+        def cuda_time() -> float:
+            torch.cuda.synchronize()
+            return time.perf_counter()
+
+        decode_start = cuda_time()
         for step in range(max_decode_steps):  # noqa: B007
             # Ensure tensors are on correct device
             draft_tokens = draft_tokens.to(input_ids.device)
@@ -590,8 +595,9 @@ class Eagle3Model(nn.Module):
             ):
                 break
 
+        total_decode_time = cuda_time() - decode_start
         return (
-            (state.input_ids, state.new_token, step, accept_length_list)
+            (state.input_ids, state.new_token, step, accept_length_list, total_decode_time)
             if log
             else state.input_ids
         )
