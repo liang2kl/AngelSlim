@@ -153,12 +153,13 @@ def tree_decoding(
     if position_ids is not None and position_ids.dim() == 1:
         position_ids = position_ids.unsqueeze(0)
     
-    # Flash attention 2 requires position_ids to have proper shape for diff() operation
-    # If tree_candidates is empty or too small, or if position_ids doesn't match
-    # the tree_candidates shape, skip position_ids to avoid errors
-    if position_ids is not None:
-        if position_ids.numel() == 0 or position_ids.shape[-1] != tree_candidates.shape[-1]:
-            position_ids = None
+    # Flash attention 2 has issues with tree-structured position_ids during speculative decoding
+    # Temporarily switch to eager attention for tree decoding to avoid errors
+    original_attn_impl = None
+    if hasattr(model.base_model.config, '_attn_implementation'):
+        original_attn_impl = model.base_model.config._attn_implementation
+        if original_attn_impl == "flash_attention_2":
+            model.base_model.config._attn_implementation = "sdpa"
     
     outputs, tree_logits, hidden_state = model(
         input_ids=tree_candidates,
@@ -166,6 +167,10 @@ def tree_decoding(
         past_key_values=past_key_values,
         position_ids=position_ids,
     )
+    
+    # Restore original attention implementation
+    if original_attn_impl is not None:
+        model.base_model.config._attn_implementation = original_attn_impl
 
     eagle_device = next(model.eagle_layer.parameters()).device
     if outputs["hidden_states"][0].device != eagle_device:
