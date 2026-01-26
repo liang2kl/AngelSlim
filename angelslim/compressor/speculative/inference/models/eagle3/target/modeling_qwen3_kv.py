@@ -628,6 +628,12 @@ class Qwen3Model(Qwen3PreTrainedModel):
 
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)
+        
+        # Flash attention 2 requires position_ids with valid shape
+        # If position_ids is malformed (empty or mismatched), regenerate from cache_position
+        if self.config._attn_implementation == "flash_attention_2":
+            if position_ids.numel() == 0 or position_ids.shape[-1] == 0:
+                position_ids = cache_position.unsqueeze(0)
 
         causal_mask = self._update_causal_mask(
             attention_mask,

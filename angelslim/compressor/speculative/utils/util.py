@@ -152,6 +152,14 @@ def tree_decoding(
     position_ids = tree_position_ids + input_ids.shape[1]
     if position_ids is not None and position_ids.dim() == 1:
         position_ids = position_ids.unsqueeze(0)
+    
+    # Flash attention 2 requires position_ids to have proper shape for diff() operation
+    # If tree_candidates is empty or too small, or if position_ids doesn't match
+    # the tree_candidates shape, skip position_ids to avoid errors
+    if position_ids is not None:
+        if position_ids.numel() == 0 or position_ids.shape[-1] != tree_candidates.shape[-1]:
+            position_ids = None
+    
     outputs, tree_logits, hidden_state = model(
         input_ids=tree_candidates,
         output_orig=True,
