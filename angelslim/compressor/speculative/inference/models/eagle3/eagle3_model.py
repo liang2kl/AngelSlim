@@ -40,6 +40,9 @@ from .draft import CosyVoice3Llama3Eagle3Drafter, Llama3Eagle3Drafter
 from .target import CosyVoice3 as KVCosyVoice3
 from .target import LlamaForCausalLM as KVLlamaForCausalLM
 from .target import Qwen3ForCausalLM as KVQwen3ForCausalLM
+from .target import Qwen3MoeForCausalLM as KVQwen3MoeForCausalLM
+
+from copy import deepcopy
 
 
 @dataclass
@@ -73,6 +76,7 @@ class ModelLoader:
     SUPPORTED_ARCHITECTURES = {
         "LlamaForCausalLM": KVLlamaForCausalLM,
         "Qwen3ForCausalLM": KVQwen3ForCausalLM,
+        "Qwen3MoeForCausalLM": KVQwen3MoeForCausalLM,
         "CosyVoice3": KVCosyVoice3,
     }
 
@@ -597,7 +601,13 @@ class Eagle3Model(nn.Module):
 
         total_decode_time = cuda_time() - decode_start
         return (
-            (state.input_ids, state.new_token, step, accept_length_list, total_decode_time)
+            (
+                state.input_ids,
+                state.new_token,
+                step,
+                accept_length_list,
+                total_decode_time,
+            )
             if log
             else state.input_ids
         )

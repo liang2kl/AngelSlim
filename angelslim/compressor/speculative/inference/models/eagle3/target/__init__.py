@@ -15,5 +15,6 @@
 from .modeling_cosyvoice3_kv import CosyVoice3
 from .modeling_llama_kv import LlamaForCausalLM
 from .modeling_qwen3_kv import Qwen3ForCausalLM
+from .modeling_qwen3_moe_kv import Qwen3MoeForCausalLM
 
-__all__ = ["LlamaForCausalLM", "Qwen3ForCausalLM", "CosyVoice3"]
+__all__ = ["LlamaForCausalLM", "Qwen3ForCausalLM", "Qwen3MoeForCausalLM", "CosyVoice3"]

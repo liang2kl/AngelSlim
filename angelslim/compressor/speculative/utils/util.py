@@ -167,10 +167,6 @@ def tree_decoding(
         past_key_values=past_key_values,
         position_ids=position_ids,
     )
-    
-    # Restore original attention implementation
-    if original_attn_impl is not None:
-        model.base_model.config._attn_implementation = original_attn_impl
 
     eagle_device = next(model.eagle_layer.parameters()).device
     if outputs["hidden_states"][0].device != eagle_device:
