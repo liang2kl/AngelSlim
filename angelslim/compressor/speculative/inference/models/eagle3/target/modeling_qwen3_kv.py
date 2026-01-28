@@ -650,7 +650,7 @@ class Qwen3Model(Qwen3PreTrainedModel):
         for idx, decoder_layer in enumerate(
             self.layers[: self.config.num_hidden_layers]
         ):
-            if idx == len(self.layers) - 3 or idx == len(self.layers) // 2 or idx == 2:
+            if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
             if self.gradient_checkpointing and self.training:

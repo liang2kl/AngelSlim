@@ -113,10 +113,13 @@ def initialize_tree(input_ids, inputs_embeds, model, past_key_values, logits_pro
 
     # Clone the output hidden states
     eagle_device = next(model.eagle_layer.parameters()).device
-    if outputs["hidden_states"][0].device != eagle_device:
-        outputs["hidden_states"] = [
-            x.to(eagle_device) for x in outputs["hidden_states"]
-        ]
+    outputs["hidden_states"] = [
+        x.to(eagle_device)
+        for i, x in enumerate(outputs["hidden_states"])
+        if i == model.base_model.config.num_hidden_layers - 3
+        or i == model.base_model.config.num_hidden_layers // 2
+        or i == 2
+    ]
     hidden_states = torch.cat(outputs["hidden_states"], dim=-1)
     draft_tokens, retrieve_indices, tree_mask, tree_position_ids, _ = (
         model.eagle_layer.topK_genrate(
@@ -152,7 +155,7 @@ def tree_decoding(
     position_ids = tree_position_ids + input_ids.shape[1]
     if position_ids is not None and position_ids.dim() == 1:
         position_ids = position_ids.unsqueeze(0)
-    
+
     # Flash attention 2 has issues with tree-structured position_ids during speculative decoding
     # Temporarily switch to eager attention for tree decoding to avoid errors
     # original_attn_impl = None
@@ -160,7 +163,7 @@ def tree_decoding(
     #     original_attn_impl = model.base_model.config._attn_implementation
     #     if original_attn_impl == "flash_attention_2":
     #         model.base_model.config._attn_implementation = "sdpa"
-    
+
     outputs, tree_logits, hidden_state = model(
         input_ids=tree_candidates,
         output_orig=True,
@@ -169,10 +172,13 @@ def tree_decoding(
     )
 
     eagle_device = next(model.eagle_layer.parameters()).device
-    if outputs["hidden_states"][0].device != eagle_device:
-        outputs["hidden_states"] = [
-            x.to(eagle_device) for x in outputs["hidden_states"]
-        ]
+    outputs["hidden_states"] = [
+        x.to(eagle_device)
+        for i, x in enumerate(outputs["hidden_states"])
+        if i == model.base_model.config.num_hidden_layers - 3
+        or i == model.base_model.config.num_hidden_layers // 2
+        or i == 2
+    ]
     hidden_state = torch.cat(outputs["hidden_states"], dim=-1)
 
     logits = tree_logits[0, retrieve_indices]

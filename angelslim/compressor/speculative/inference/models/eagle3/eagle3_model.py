@@ -420,6 +420,7 @@ class Eagle3Model(nn.Module):
                 attention_mask=attention_mask,
                 past_key_values=past_key_values,
                 position_ids=position_ids,
+                output_hidden_states=True,
             )
 
             hidden_states = outputs[0]
