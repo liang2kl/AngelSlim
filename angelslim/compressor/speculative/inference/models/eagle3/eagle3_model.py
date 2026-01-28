@@ -77,7 +77,6 @@ class ModelLoader:
         "LlamaForCausalLM": KVLlamaForCausalLM,
         "Qwen3ForCausalLM": KVQwen3ForCausalLM,
         "Qwen3MoeForCausalLM": KVQwen3MoeForCausalLM,
-        "CosyVoice3": KVCosyVoice3,
     }
 
     @classmethod
@@ -460,6 +459,10 @@ class Eagle3Model(nn.Module):
         state = self.generation_manager.prepare_generation(self, input_ids, config)
         padding = self.generation_manager.get_padding_token(input_ids.device)
 
+        def cuda_time() -> float:
+            torch.cuda.synchronize()
+            return time.perf_counter()
+
         # Prefill phase
         draft_tokens, retrieve_indices, tree_mask, tree_position_ids, logits, _, _ = (
             initialize_tree(
@@ -490,9 +493,9 @@ class Eagle3Model(nn.Module):
                 predictors.append(predict_class(**kwargs))
         is_thinking = True
 
-        def cuda_time() -> float:
-            torch.cuda.synchronize()
-            return time.perf_counter()
+
+        total_verify_time = 0.0
+        total_draft_time = 0.0
 
         decode_start = cuda_time()
         for step in range(max_decode_steps):  # noqa: B007
@@ -506,6 +509,7 @@ class Eagle3Model(nn.Module):
                 self.base_model.model.tree_mask = tree_mask
 
             # Target model forward pass
+            verify_start = cuda_time()
             logits, hidden_state_new, _ = tree_decoding(
                 self,
                 draft_tokens,
@@ -522,6 +526,7 @@ class Eagle3Model(nn.Module):
             best_candidate, accept_length, sample_token = evaluate_posterior(
                 logits, candidates, state.logits_processor
             )
+            total_verify_time += cuda_time() - verify_start
 
             new_token_ids = (
                 candidates[None, best_candidate, : accept_length + 1].view(-1).tolist()
@@ -561,6 +566,7 @@ class Eagle3Model(nn.Module):
             )
 
             # Update inference inputs
+            draft_start = cuda_time()
             (
                 state.input_ids,
                 inputs_embeds,
@@ -585,6 +591,8 @@ class Eagle3Model(nn.Module):
                 hidden_state_new=hidden_state_new,
                 sample_token=sample_token,
             )
+            total_draft_time += cuda_time() - draft_start
+
             if is_thinking and early_stop_signal is not None:
                 early_stop_signal_cpu = early_stop_signal.tolist()
                 for p, s in zip(predictors, early_stop_signal_cpu):
@@ -606,7 +614,7 @@ class Eagle3Model(nn.Module):
                 state.new_token,
                 step,
                 accept_length_list,
-                total_decode_time,
+                (total_decode_time, total_verify_time, total_draft_time),
             )
             if log
             else state.input_ids
@@ -643,6 +651,11 @@ class Eagle3Model(nn.Module):
 
         max_decode_steps = config.max_length - self.eagle_layer.total_tokens - 10
 
+        def cuda_time() -> float:
+            torch.cuda.synchronize()
+            return time.perf_counter()
+
+        decode_start = cuda_time()
         for step in range(max_decode_steps):  # noqa: B007
             if state.logits_processor is not None:
                 logits = state.logits_processor(None, outputs.logits[:, -1])
@@ -666,7 +679,13 @@ class Eagle3Model(nn.Module):
             ):
                 break
 
-        return (state.input_ids, state.new_token, step) if log else state.input_ids
+        total_decode_time = cuda_time() - decode_start
+
+        return (
+            (state.input_ids, state.new_token, step, total_decode_time)
+            if log
+            else state.input_ids
+        )
 
 
 class CosyVoice3Eagle3Model(Eagle3Model):

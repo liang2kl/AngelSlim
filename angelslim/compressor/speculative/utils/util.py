@@ -155,11 +155,11 @@ def tree_decoding(
     
     # Flash attention 2 has issues with tree-structured position_ids during speculative decoding
     # Temporarily switch to eager attention for tree decoding to avoid errors
-    original_attn_impl = None
-    if hasattr(model.base_model.config, '_attn_implementation'):
-        original_attn_impl = model.base_model.config._attn_implementation
-        if original_attn_impl == "flash_attention_2":
-            model.base_model.config._attn_implementation = "sdpa"
+    # original_attn_impl = None
+    # if hasattr(model.base_model.config, '_attn_implementation'):
+    #     original_attn_impl = model.base_model.config._attn_implementation
+    #     if original_attn_impl == "flash_attention_2":
+    #         model.base_model.config._attn_implementation = "sdpa"
     
     outputs, tree_logits, hidden_state = model(
         input_ids=tree_candidates,
